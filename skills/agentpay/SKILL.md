@@ -5,59 +5,115 @@ description: Give an AI agent its own payment card and let it buy things safely.
 
 # AgentPay, payments for AI agents
 
-AgentPay gives an agent three things it did not have: its own cards with a limit the person sets, the ability to clear the bank's security check (3DS) on its own, and its own browser with its own merchant logins so it can check out alone.
+AgentPay gives an agent three things it did not have: its own cards with a limit the person sets, the ability to clear the bank's security check (3DS) on its own, and its own browser with its own merchant logins so it can check out alone. Everything below runs against the live AgentPay API with one API key.
 
-This plugin brings six MCP tools, served by the `agentpay` server it installs. The person entered their AgentPay API key once when they enabled the plugin; the server holds it and you never see it, type it or ask for it. Use the tools. Do not call the API with curl or write code that reads a key.
+## Setup, once
+
+1. The person creates an API key in the AgentPay console: https://app.agentpay.global, Developer, API keys. Keys look like `mk_live_...` and are shown once.
+2. The key is the person's. In the examples below, `YOUR_AGENTPAY_API_KEY` stands for it. Ask the person for the key when you need it, or better, have them add the AgentPay MCP server once (below) so the tools carry it and you never handle it. Never write the key to a file, a log, a message or a prompt.
+
+3. Base URL: `https://api.joomjoo.com`. Every request sends `Authorization: Bearer YOUR_AGENTPAY_API_KEY`. Amounts are US dollars. Every response carries a `request_id`; quote it when something goes wrong.
+
+Prefer the SDK when the project has one: `npm install @agentpay-global/sdk` (`import { AgentPay } from "@agentpay-global/sdk"`), `pip install agentpay-global` (`from agentpay import AgentPay`). In Claude Code the person adds the AgentPay MCP server once, `claude mcp add agentpay --env AGENTPAY_API_KEY=YOUR_AGENTPAY_API_KEY -- npx -y @agentpay-global/mcp`, and the same six tools appear as tools named `issue_card`, `complete_purchase`, `get_checkout_status`, `get_spend_status`, `get_wallet` and `create_topup_link`. When those tools are present, use them instead of curl.
 
 ## The six tools
 
 ### complete_purchase: hand AgentPay the whole checkout (preferred)
 
-Give `task` (plain English), `merchant` and `amount` (the most you may spend, in US dollars). AgentPay opens the merchant in its own browser, uses the person's stored login when there is one, reaches the final review, pays with the agent's own card or mints a single-use card for the real total plus a small margin (never above the cap), pays, and clears 3DS itself. The card number never touches you.
+Give a plain-English task, the merchant, and the most you may spend. AgentPay opens the merchant in its own browser, uses the person's stored login when there is one, reaches the final review, mints a single-use card for the real total plus a small margin (never above the cap), pays, and clears 3DS itself. The card number never touches you.
+
+```
+curl -s https://api.joomjoo.com/v1/checkout \
+  -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"task": "buy the domain example.click for 1 year", "merchant": "namecheap", "amount": 20, "confirm_pay": false, "idempotency_key": "order-2026-09-25-001"}'
+```
+
+Response: `{"checkout_id": "...", "status": "queued", "confirm_pay": false, "host": "www.namecheap.com", "poll": "/v1/checkout/{id}"}`.
 
 - `confirm_pay: false` (default): the run stops at the final review and waits for the person's yes in the AgentPay console. `confirm_pay: true`: pay without a human yes, up to the cap. The person's own approval mode for their agent can only make this stricter; the response's `confirm_pay` says what was granted.
-- The answer is `checkout_id` and `status: "queued"`. A checkout takes one to three minutes. Poll it with `get_checkout_status`.
+- `idempotency_key`: your own reference. A retry with the same key returns the same checkout instead of a second purchase. Always send one.
+- `start_url`: the exact https page to open, when the merchant has no stored login on the account yet. A 400 `site_required` or `site_ambiguous` means: pass `start_url`, or ask the person to connect the merchant once in the console (Developer, Connections).
 
 ### get_checkout_status: poll until a terminal status
 
-Call it every 30 seconds with the `checkout_id`. Statuses and what to do:
+```
+curl -s https://api.joomjoo.com/v1/checkout/CHECKOUT_ID \
+  -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY"
+```
+
+Poll every 5 to 10 seconds. Statuses and what to do:
 
 | status | meaning | what you do |
 |---|---|---|
 | queued, running, paying | AgentPay is working | keep polling |
-| needs_login | the merchant wants a signed-in session | the person signs in once at the `connect_url` on the status (you never type a password), then start again |
+| needs_login | the merchant wants a signed-in session | read `login_check`, `login_url` and `connect_url` on the status: `signed_out` or `unknown` means the person signs in once at `connect_url` (the agent never types a password), then start again on the same connection; `passkey_password` means the person is signed in and the merchant wants the password once so AgentPay can add its passkey (type it at `connect_url` and start again, or `POST /v1/connections/{id}/passkey` with `{"action": "skip"}` to keep the plain session) |
 | needs_answer | AgentPay asked the person a choice (size, delivery slot) in the console | wait, keep polling |
 | awaiting_approval | the final review is ready, `review_total` shows the shop's total (a display string such as "60.90 AED") | tell the person to approve in the console, keep polling |
 | submitted | paid; `order_id` and `order_total` are set | done, report the order |
 | canceled | the person stopped it | stop, nothing was charged |
 | blocked | AgentPay stopped (login wall, timeout, cap exceeded); `error_reason` says why | report the reason, do not retry blindly |
-| error | the engine failed; nothing was charged and any card was closed | report, retry later |
+| error | the engine failed; nothing was charged and any card was closed | report, retry later with the same idempotency_key |
 
 ### issue_card: a real card with a cap, when you must pay yourself
 
-`amount`, `merchant`, `single_use` (default true). Returns `id`, `brand`, `last4`, `exp_month`, `exp_year`, `spend_limit`, `status`, `spend_request_id`. Only for the rare case the agent itself must type a card. Never log or store a card number. A 402 `insufficient_funds` means the wallet needs funding by the person.
+```
+curl -s https://api.joomjoo.com/v1/cards \
+  -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 20, "merchant": "namecheap", "single_use": true}'
+```
+
+Response: `id`, `brand`, `last4`, `exp_month`, `exp_year`, `spend_limit`, `single_use`, `status`, `spend_request_id`. Reveal the number only at the moment of use with `GET /v1/cards/{id}` (fields `number`, `cvc`, `exp`), never log it, never store it. Close a card you no longer need with `POST /v1/cards/{id}/close`; the unused reserve returns to the wallet. A 402 `insufficient_funds` means the wallet needs funding by the person.
 
 ### get_spend_status: did the card get charged
 
-Pass the `spend_request_id` from `issue_card`. `status` is `not_started`, `authorized`, `cleared` or `declined`; `settled` is true once the bank cleared it, usually the next day.
+```
+curl -s https://api.joomjoo.com/v1/spend/SPEND_REQUEST_ID \
+  -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY"
+```
+
+`status` is `not_started`, `authorized`, `cleared` or `declined`; `settled` is true once the bank cleared it, usually the next day.
 
 ### get_wallet: what the account can spend
 
-Returns `balance`, `available` (free to assign to a new card), `reserved` (on open cards), `pending` (bank money not landed yet), in dollars, plus `cards_ready`: open single-use cards that already hold money. Judge affordability by `ready_to_spend`, never by `available` alone.
+```
+curl -s https://api.joomjoo.com/v1/wallet \
+  -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY"
+```
+
+Returns `balance`, `available` (free to assign to a new card), `reserved` (on open cards) and `pending` (bank money not landed yet), in dollars, plus display strings. Check it when a 402 `insufficient_funds` is possible.
 
 ### create_topup_link: when the wallet is short
 
-`amount` in dollars. Returns a Stripe Checkout `url`. Give it to the person; Stripe takes a card or stablecoin; the wallet is credited the moment Stripe confirms. Never type a card yourself, never ask the person for their card number.
+```
+curl -s https://api.joomjoo.com/v1/wallet/funding-sessions \
+  -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 50, "success_url": "https://yourapp.example/funded"}'
+```
+
+Returns a Stripe Checkout `url`. Give it to the person; Stripe takes a card or stablecoin; the wallet is credited the moment Stripe confirms (webhook `money.funded`). Never type a card yourself, never ask the person for their card number. For a bank transfer, `POST /v1/wallet/bank-transfers` with `amount` and `rail` (`ach`, `wire_domestic`, `wire_international`, `uae_local`) returns the account to send to and a `reference_code` for the memo; the money is pending until it lands.
 
 ## Rules, always
 
 - Never spend above the cap you were given. One card per purchase; a single-use card locks itself after its first charge.
 - Prefer `complete_purchase`. Only issue a card yourself when you truly must type it in.
-- Pay only with the AgentPay card; never a card saved on the merchant account.
+- Pay only with the AgentPay card; never a card saved on the merchant account. Confirm the last four digits before paying.
 - 3DS is handled by AgentPay. Never ask the person for an OTP.
-- Never put a card number or a CVC in a log, a message, a file or a prompt.
+- Send an `idempotency_key` on every checkout and retry with the same one.
+- Never put the API key, a card number or a CVC in a log, a message, a file or a prompt.
 - Errors carry a machine code (`invalid_api_key`, `expired_api_key`, `plan_limit`, `agent_paused`, `busy`, `checkout_not_found`) and a message written for the person; pass the message on as it is.
 
-## Outside this plugin
+## Webhooks instead of polling
 
-The same six tools exist as `@agentpay-global/sdk` (npm), `agentpay-global` (PyPI), the `@agentpay-global/mcp` server for other MCP clients, and the REST API documented at https://agentpay.global/docs. Everything in this repository is the plugin for Claude Code, Cowork and the Claude apps.
+The person can register an endpoint in the console (Developer, Webhooks). Each delivery is `{"id", "type", "created", "data"}` with the `Joomjoo-Signature: t=<unix>,v1=<hex>` header, an HMAC-SHA256 of `t + "." + rawBody` with the endpoint's signing secret. Events: `card.authorized`, `card.cleared`, `card.declined`, `checkout.submitted`, `checkout.needs_login`, `checkout.blocked`, `money.funded`.
+
+
+## Merchant logins and the AgentPay passkey
+
+A connection is the person's signed-in session at one merchant. `POST /v1/connections` gives a `connect_url` where the person signs in once; `POST /v1/connections/{id}/complete` saves it. On merchants that take passkeys (Amazon first), AgentPay then adds its own passkey to that account the next time a checkout runs, and from then on every checkout signs in by itself, even after the merchant expires the session: `GET /v1/connections` shows `layer: "passkey"` and `passkey_status: "connected"` (or `connected_unmanaged` when the merchant shows no identifier AgentPay can use to delete the entry remotely). The agent does nothing for this. `DELETE /v1/connections/{id}` disconnects: the key is destroyed first, then the entry is removed at the merchant when AgentPay can (`passkey_status` ends `removed` or `removed_locally`, the latter meaning the person removes the "Joomjoo-..." entry in the merchant's security settings). A checkout's `login_layer` says `passkey` or `session`.
+
+## The person's own card (connected, not issued)
+
+A cardholder can connect one of their OWN credit or debit cards once, behind a passkey, and the agent pays with it after they approve each purchase on their phone. `POST /v1/cards/connect` returns a one-hour, single-use `connect_url`; send it to the cardholder, never open it yourself. `GET /v1/cards` lists it with `source: "own"`. To pay with it, pass `own_card_id` on `POST /v1/checkout`: the checkout stops at the review with status `needs_card_approval` and an `approval_url` (also on the `checkout.needs_card_approval` event); give that link to the cardholder, who types the security code and confirms with their passkey. `confirm_pay` cannot skip that approval, and the bank's own check (3-D Secure) on a connected card is the cardholder's to complete on the agent's screen. `DELETE /v1/cards/{id}` removes a connected card. A connected card has no cap beyond the approved order, nothing is issued and nothing is prepaid.
