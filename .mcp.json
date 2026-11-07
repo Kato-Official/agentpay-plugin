@@ -4,7 +4,7 @@
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"],
       "env": {
-        "AGENTPAY_API_KEY": "${user_config.agentpay_api_key}"
+        "CLAUDE_PLUGIN_OPTION_AGENTPAY_API_KEY": "${user_config.agentpay_api_key}"
       }
     }
   }

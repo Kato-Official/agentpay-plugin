@@ -23,7 +23,7 @@
     "agentpay_api_key": {
       "type": "string",
       "title": "AgentPay API key",
-      "description": "Your mk_live_ key from app.agentpay.global, Developer, API keys. Kept in your secure credential store and handed only to the AgentPay MCP server in this plugin.",
+      "description": "Your mk_live_ key from app.agentpay.global, Developer, API keys. Kept in your secure credential store and handed only to the AgentPay MCP server in this plugin as its plugin option.",
       "sensitive": true,
       "required": true
     }

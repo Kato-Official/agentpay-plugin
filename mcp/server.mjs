@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // AgentPay MCP server for the Claude plugin. Zero dependencies: Node 18+ and the MCP stdio protocol
 // (newline-delimited JSON-RPC 2.0 on stdin and stdout). It talks to exactly one service, the AgentPay
-// API at https://api.joomjoo.com, with the key the person entered when enabling the plugin, which
-// Claude Code passes in as the AGENTPAY_API_KEY environment variable of this process.
+// API at https://api.joomjoo.com, with the key the person entered when enabling the plugin. Claude Code
+// hands that plugin option to this process as CLAUDE_PLUGIN_OPTION_AGENTPAY_API_KEY; nothing else is read.
 //
 // Tools: issue_card, complete_purchase, get_checkout_status, get_spend_status, get_wallet, create_topup_link.
 // Nothing here stores the key, a card number or a response anywhere. Every answer is passed straight back.
@@ -10,15 +10,15 @@
 import { createInterface } from "node:readline";
 
 const VERSION = "0.3.1";
-const BASE_URL = (process.env.AGENTPAY_BASE_URL || "https://api.joomjoo.com").replace(/\/+$/, "");
-const API_KEY = process.env.AGENTPAY_API_KEY;
+const BASE_URL = "https://api.joomjoo.com";
+const API_KEY = process.env.CLAUDE_PLUGIN_OPTION_AGENTPAY_API_KEY;
 
 function log(message) {
   process.stderr.write(`[agentpay-mcp] ${message}\n`);
 }
 
 if (!API_KEY) {
-  log("AGENTPAY_API_KEY is not set. Enable the AgentPay plugin again and enter your mk_live_ key from app.agentpay.global, Developer, API keys.");
+  log("The AgentPay API key option is empty. Enable the AgentPay plugin again and enter your mk_live_ key from app.agentpay.global, Developer, API keys.");
   process.exit(1);
 }
 
