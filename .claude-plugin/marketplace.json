@@ -1,0 +1,16 @@
+{
+  "name": "agentpay",
+  "owner": { "name": "AgentPay", "email": "support@joomjoo.com" },
+  "metadata": {
+    "description": "Payments for AI agents: the AgentPay skill and MCP server.",
+    "version": "0.3.1"
+  },
+  "plugins": [
+    {
+      "name": "agentpay",
+      "source": "./",
+      "description": "Payments for AI agents. A card with a limit you set, 3DS cleared, checkout in the agent's own browser.",
+      "category": "productivity"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "agentpay",
+  "displayName": "AgentPay",
+  "version": "0.3.1",
+  "description": "Payments for AI agents. Your agent gets its own card with a limit you set, clears the bank's 3DS check itself, and checks out in its own browser.",
+  "author": {
+    "name": "AgentPay",
+    "email": "support@joomjoo.com",
+    "url": "https://agentpay.global"
+  },
+  "homepage": "https://github.com/Kato-Official/agentpay-plugin",
+  "repository": "https://github.com/Kato-Official/agentpay-plugin",
+  "license": "MIT",
+  "keywords": ["payments", "ai-agents", "virtual-cards", "checkout", "3ds", "mcp"],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://agentpay.global/docs",
+  "supportUrl": "https://agentpay.global/contact.html",
+  "privacyPolicyUrl": "https://agentpay.global/legal/privacy.html",
+  "termsOfServiceUrl": "https://agentpay.global/legal/terms.html",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "userConfig": {
+    "agentpay_api_key": {
+      "type": "string",
+      "title": "AgentPay API key",
+      "description": "Your mk_live_ key from app.agentpay.global, Developer, API keys. Kept in your secure credential store and handed only to the AgentPay MCP server in this plugin.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}
