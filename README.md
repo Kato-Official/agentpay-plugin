@@ -7,7 +7,7 @@ This plugin is one skill. It teaches Claude the six AgentPay tools (`complete_pu
 ## What it runs and where data goes
 
 - The plugin runs nothing on your computer. It is Markdown, JSON and two PNG images.
-- The skill talks about exactly one service, the AgentPay API at `https://api.joomjoo.com`, which Claude calls only when you ask it to buy or check something, with the API key you give it or through the AgentPay MCP server you add yourself.
+- The skill talks about exactly one service, the AgentPay API at `https://api.agentpay.global`, which Claude calls only when you ask it to buy or check something, with the API key you give it or through the AgentPay MCP server you add yourself.
 - The plugin stores nothing. Your AgentPay account keeps its own purchase history, which you see in the console at https://app.agentpay.global.
 - The agent never sees a full card number. AgentPay mints the card at the final review and pays inside its own browser.
 

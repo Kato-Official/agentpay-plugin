@@ -12,7 +12,7 @@ AgentPay gives an agent three things it did not have: its own cards with a limit
 1. The person creates an API key in the AgentPay console: https://app.agentpay.global, Developer, API keys. Keys look like `mk_live_...` and are shown once.
 2. The key is the person's. In the examples below, `YOUR_AGENTPAY_API_KEY` stands for it. Ask the person for the key when you need it, or better, have them add the AgentPay MCP server once (below) so the tools carry it and you never handle it. Never write the key to a file, a log, a message or a prompt.
 
-3. Base URL: `https://api.joomjoo.com`. Every request sends `Authorization: Bearer YOUR_AGENTPAY_API_KEY`. Amounts are US dollars. Every response carries a `request_id`; quote it when something goes wrong.
+3. Base URL: `https://api.agentpay.global`. Every request sends `Authorization: Bearer YOUR_AGENTPAY_API_KEY`. Amounts are US dollars. Every response carries a `request_id`; quote it when something goes wrong.
 
 Prefer the SDK when the project has one: `npm install @agentpay-global/sdk` (`import { AgentPay } from "@agentpay-global/sdk"`), `pip install agentpay-global` (`from agentpay import AgentPay`). In Claude Code the person adds the AgentPay MCP server once, `claude mcp add agentpay --env AGENTPAY_API_KEY=YOUR_AGENTPAY_API_KEY -- npx -y @agentpay-global/mcp`, and the same six tools appear as tools named `issue_card`, `complete_purchase`, `get_checkout_status`, `get_spend_status`, `get_wallet` and `create_topup_link`. When those tools are present, use them instead of curl.
 
@@ -23,7 +23,7 @@ Prefer the SDK when the project has one: `npm install @agentpay-global/sdk` (`im
 Give a plain-English task, the merchant, and the most you may spend. AgentPay opens the merchant in its own browser, uses the person's stored login when there is one, reaches the final review, mints a single-use card for the real total plus a small margin (never above the cap), pays, and clears 3DS itself. The card number never touches you.
 
 ```
-curl -s https://api.joomjoo.com/v1/checkout \
+curl -s https://api.agentpay.global/v1/checkout \
   -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"task": "buy the domain example.click for 1 year", "merchant": "namecheap", "amount": 20, "confirm_pay": false, "idempotency_key": "order-2026-09-25-001"}'
@@ -38,7 +38,7 @@ Response: `{"checkout_id": "...", "status": "queued", "confirm_pay": false, "hos
 ### get_checkout_status: poll until a terminal status
 
 ```
-curl -s https://api.joomjoo.com/v1/checkout/CHECKOUT_ID \
+curl -s https://api.agentpay.global/v1/checkout/CHECKOUT_ID \
   -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY"
 ```
 
@@ -58,7 +58,7 @@ Poll every 5 to 10 seconds. Statuses and what to do:
 ### issue_card: a real card with a cap, when you must pay yourself
 
 ```
-curl -s https://api.joomjoo.com/v1/cards \
+curl -s https://api.agentpay.global/v1/cards \
   -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"amount": 20, "merchant": "namecheap", "single_use": true}'
@@ -69,7 +69,7 @@ Response: `id`, `brand`, `last4`, `exp_month`, `exp_year`, `spend_limit`, `singl
 ### get_spend_status: did the card get charged
 
 ```
-curl -s https://api.joomjoo.com/v1/spend/SPEND_REQUEST_ID \
+curl -s https://api.agentpay.global/v1/spend/SPEND_REQUEST_ID \
   -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY"
 ```
 
@@ -78,7 +78,7 @@ curl -s https://api.joomjoo.com/v1/spend/SPEND_REQUEST_ID \
 ### get_wallet: what the account can spend
 
 ```
-curl -s https://api.joomjoo.com/v1/wallet \
+curl -s https://api.agentpay.global/v1/wallet \
   -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY"
 ```
 
@@ -87,7 +87,7 @@ Returns `balance`, `available` (free to assign to a new card), `reserved` (on op
 ### create_topup_link: when the wallet is short
 
 ```
-curl -s https://api.joomjoo.com/v1/wallet/funding-sessions \
+curl -s https://api.agentpay.global/v1/wallet/funding-sessions \
   -H "Authorization: Bearer YOUR_AGENTPAY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"amount": 50, "success_url": "https://yourapp.example/funded"}'
